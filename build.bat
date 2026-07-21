@@ -13,6 +13,7 @@ if not exist ".venv\Scripts\activate.bat" (
 )
 
 call .venv\Scripts\activate.bat
+taskkill /f /im FolderCreator.exe >nul 2>&1
 pip install pyinstaller >nul
 
 pyinstaller ^
