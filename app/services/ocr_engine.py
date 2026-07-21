@@ -9,34 +9,46 @@ from app.services.validator import extract_serial_number, extract_device_id
 
 logger = logging.getLogger(__name__)
 
-# None = not yet initialised; False = init failed (avoid retrying each rotation pass)
-_paddle_ocr = None
-_paddle_ocr_failed = False
+# None = not yet initialised; False = init failed
+_ocr_engine = None
+_ocr_engine_failed = False
+_engine_type = None
 
 
 def _get_ocr(language: str):
-    global _paddle_ocr, _paddle_ocr_failed
-    if _paddle_ocr_failed:
+    global _ocr_engine, _ocr_engine_failed, _engine_type
+    if _ocr_engine_failed:
         return None
-    if _paddle_ocr is None:
-        from paddleocr import PaddleOCR
-        logger.info("Initialising PaddleOCR (lang=%s)", language)
+    if _ocr_engine is None:
+        # Try RapidOCR (ONNX version of PaddleOCR - 100% reliable across Python 3.8-3.14)
         try:
-            # PaddleOCR v3.x — minimal constructor (no use_angle_cls / use_gpu / show_log)
-            _paddle_ocr = PaddleOCR(lang=language)
+            from rapidocr_onnxruntime import RapidOCR
+            logger.info("Initialising RapidOCR (ONNX engine)")
+            _ocr_engine = RapidOCR()
+            _engine_type = "rapid"
+            return _ocr_engine
         except Exception:
+            logger.debug("RapidOCR not installed, trying PaddleOCR fallback")
+
+        # Fallback to PaddleOCR
+        try:
+            from paddleocr import PaddleOCR
+            logger.info("Initialising PaddleOCR (lang=%s)", language)
             try:
-                # PaddleOCR v2.x fallback
-                _paddle_ocr = PaddleOCR(use_angle_cls=True, lang=language, show_log=False)
+                _ocr_engine = PaddleOCR(lang=language)
             except Exception:
-                logger.exception("PaddleOCR initialisation failed")
-                _paddle_ocr_failed = True
-                return None
-    return _paddle_ocr
+                _ocr_engine = PaddleOCR(use_angle_cls=True, lang=language, show_log=False)
+            _engine_type = "paddle"
+            return _ocr_engine
+        except Exception as exc:
+            logger.error("Failed to initialize any OCR engine: %s", exc)
+            _ocr_engine_failed = True
+            return None
+    return _ocr_engine
 
 
 def run_ocr(image: np.ndarray, language: str = "en", use_gpu: bool = False) -> OCRResult:
-    """Run PaddleOCR with multi-orientation scan until both S/N and ID are extracted."""
+    """Run OCR with multi-orientation scan until both S/N and ID are extracted."""
     if image is None:
         return OCRResult()
 
@@ -64,21 +76,30 @@ def run_ocr(image: np.ndarray, language: str = "en", use_gpu: bool = False) -> O
 
 
 def _single_pass_ocr(image: np.ndarray, language: str) -> OCRResult:
-    ocr = _get_ocr(language)
-    if ocr is None:
+    engine = _get_ocr(language)
+    if engine is None:
         return OCRResult()
 
-    try:
-        raw = ocr.ocr(image, cls=True)
-    except Exception:
+    lines: list[str] = []
+    if _engine_type == "rapid":
         try:
-            # v3.x may use predict() instead of ocr()
-            raw = ocr.predict(image)
+            res, _ = engine(image)
+            if res:
+                lines = [str(item[1]) for item in res if len(item) >= 2 and item[1]]
         except Exception:
-            logger.exception("PaddleOCR inference failed")
+            logger.exception("RapidOCR inference failed")
             return OCRResult()
+    else:
+        try:
+            raw = engine.ocr(image, cls=True)
+        except Exception:
+            try:
+                raw = engine.predict(image)
+            except Exception:
+                logger.exception("PaddleOCR inference failed")
+                return OCRResult()
+        lines = _parse_raw_results(raw)
 
-    lines = _parse_raw_results(raw)
     if not lines:
         return OCRResult()
 

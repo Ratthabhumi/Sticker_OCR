@@ -1,4 +1,5 @@
 customtkinter>=5.2.2
+rapidocr-onnxruntime
 paddleocr
 opencv-python>=4.9.0
 Pillow>=10.3.0
