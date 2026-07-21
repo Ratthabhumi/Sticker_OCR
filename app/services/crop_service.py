@@ -1,4 +1,5 @@
 import logging
+import time
 from pathlib import Path
 from typing import Optional, List
 
@@ -37,14 +38,39 @@ def get_image_rotations(img: np.ndarray) -> List[np.ndarray]:
     return [img, rot_90, rot_180, rot_270]
 
 
+import time
+
+def read_image_safe(image_path: Path, timeout: float = 3.0) -> Optional[np.ndarray]:
+    """Read an image safely using np.fromfile + cv2.imdecode, retrying if locked/writing."""
+    abs_path = Path(image_path).resolve()
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
+        if not abs_path.exists():
+            time.sleep(0.2)
+            continue
+        try:
+            # Use np.fromfile + cv2.imdecode to avoid Windows path/lock issues with cv2.imread
+            data = np.fromfile(str(abs_path), dtype=np.uint8)
+            if data.size > 0:
+                img = cv2.imdecode(data, cv2.IMREAD_COLOR)
+                if img is not None:
+                    return img
+        except Exception:
+            pass
+        time.sleep(0.2)
+
+    logger.warning("Cannot read image after retry timeout: %s", abs_path)
+    return None
+
+
 def crop_sticker(image_path: Path, padding: int = 20) -> Optional[np.ndarray]:
     """
     Detect the sticker region in the photo and return it as a numpy array.
     Falls back to the full image if detection fails.
     """
-    img = cv2.imread(str(image_path))
+    img = read_image_safe(image_path)
     if img is None:
-        logger.warning("Cannot read image: %s", image_path)
         return None
 
     region = _detect_sticker_region(img, padding)
