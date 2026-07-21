@@ -1,4 +1,6 @@
+import ctypes
 import logging
+import os
 import threading
 from pathlib import Path
 from typing import Callable, Optional, Set
@@ -64,10 +66,33 @@ class USBMonitor:
     @staticmethod
     def _removable_drives() -> Set[str]:
         result: Set[str] = set()
+        system_drive = os.environ.get("SystemDrive", "C:").upper().rstrip("\\") + "\\"
+        app_drive = Path(__file__).anchor.upper()
+
         try:
             for part in psutil.disk_partitions(all=False):
+                mount = part.mountpoint.upper()
                 opts = part.opts.lower()
-                if "removable" in opts or part.fstype.upper() in {"FAT32", "EXFAT", "FAT"}:
+
+                # Skip system drive (C:\) and app drive
+                if mount.startswith(system_drive) or mount.startswith(app_drive):
+                    continue
+
+                # Check Windows Drive Type API
+                if hasattr(ctypes, "windll"):
+                    try:
+                        dt = ctypes.windll.kernel32.GetDriveTypeW(part.mountpoint)
+                        # 2 = DRIVE_REMOVABLE, 3 = DRIVE_FIXED, 4 = DRIVE_REMOTE, 5 = DRIVE_CDROM
+                        if dt in (4, 5):  # Skip network & CD-ROM
+                            continue
+                        if dt in (2, 3):  # Accept Removable & External USB Drives (F:\, H:\, etc.)
+                            result.add(part.mountpoint)
+                            continue
+                    except Exception:
+                        pass
+
+                # Fallback checks
+                if "removable" in opts or part.fstype.upper() in {"FAT32", "EXFAT", "FAT", "NTFS"}:
                     result.add(part.mountpoint)
         except Exception:
             logger.exception("Failed to enumerate disk partitions")
