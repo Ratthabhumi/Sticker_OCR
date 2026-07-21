@@ -141,15 +141,25 @@ class AppViewModel:
         self.notify(Event.CONFIG_CHANGED, new_config)
 
     def retry_failed(self) -> None:
-        failed = self._config.resolved_failed_folder
+        failed = self._config.resolved_failed_folder.resolve()
+        sticker_folder = self._config.resolved_sticker_folder.resolve()
         count = 0
         if failed.exists():
-            for img in failed.iterdir():
-                if img.is_file():
-                    dest = self._config.resolved_sticker_folder / img.name
-                    shutil.move(str(img), str(dest))
-                    count += 1
+            for img in list(failed.iterdir()):
+                if img.is_file() and not img.name.startswith("."):
+                    dest = sticker_folder / img.name
+                    self._watch_svc.forget(dest)
+                    self._watch_svc.forget(img)
+                    try:
+                        shutil.move(str(img), str(dest))
+                        count += 1
+                        logger.info("Moved failed image for retry: %s -> %s", img.name, dest)
+                    except Exception as exc:
+                        logger.error("Failed to move image for retry: %s", exc)
         logger.info("Retrying %d failed image(s)", count)
+        if count > 0:
+            self._stats["failed"] = max(0, self._stats["failed"] - count)
+            self.notify(Event.STATS_UPDATED, self._stats)
 
     # ------------------------------------------------------------------ #
     # USB callbacks (called from USBMonitor daemon thread)                #
@@ -327,6 +337,8 @@ class AppViewModel:
         # Retry moving in case file handle is held briefly by another process (LINE/OS)
         for attempt in range(5):
             try:
+                self._watch_svc.forget(src_path)
+                self._watch_svc.forget(dest)
                 shutil.move(str(src_path), str(dest))
                 logger.info("Moved %s → %s/", src_path.name, dest_dir.name)
                 return

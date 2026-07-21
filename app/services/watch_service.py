@@ -3,7 +3,7 @@ import threading
 from pathlib import Path
 from typing import Callable, Optional
 
-from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileMovedEvent
+from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileMovedEvent, FileDeletedEvent
 from watchdog.observers import Observer
 
 from app.constants import SUPPORTED_IMAGE_EXTENSIONS
@@ -26,12 +26,23 @@ class _ImageHandler(FileSystemEventHandler):
         if not event.is_directory:
             self._dispatch(Path(event.dest_path).resolve())
 
+    def on_deleted(self, event: FileDeletedEvent) -> None:
+        if not event.is_directory:
+            self.forget(Path(event.src_path).resolve())
+
+    def forget(self, path: Path) -> None:
+        with self._lock:
+            self._seen.discard(path.resolve())
+            self._seen.discard(path)
+
     def _dispatch(self, path: Path) -> None:
         if path.suffix.lower() not in SUPPORTED_IMAGE_EXTENSIONS:
             return
+        resolved = path.resolve()
         with self._lock:
-            if path in self._seen:
+            if resolved in self._seen or path in self._seen:
                 return
+            self._seen.add(resolved)
             self._seen.add(path)
         logger.info("New image: %s", path.name)
         self._callback(path)
@@ -44,6 +55,10 @@ class WatchService:
         self._observer: Optional[Observer] = None
         self._poll_thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
+
+    def forget(self, path: Path) -> None:
+        """Forget an image path so it can be re-detected if moved back to Sticker/."""
+        self._handler.forget(path)
 
     def start(self) -> None:
         self._folder.mkdir(parents=True, exist_ok=True)

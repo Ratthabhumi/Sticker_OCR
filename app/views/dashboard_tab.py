@@ -15,8 +15,8 @@ from app.viewmodels.app_viewmodel import AppViewModel
 
 logger = logging.getLogger(__name__)
 
-_PREVIEW_W = 760
-_PREVIEW_H = 480
+_PREVIEW_W = 860
+_PREVIEW_H = 540
 
 
 class ImageZoomWindow:
@@ -299,8 +299,8 @@ class PreviewDialog:
 
         self._win = ctk.CTkToplevel(parent)
         self._win.title("Preview — Confirm OCR Result")
-        self._win.geometry("880x880")
-        self._win.minsize(700, 700)
+        self._win.geometry("960x930")
+        self._win.minsize(750, 750)
         self._win.resizable(True, True)
         self._win.attributes("-topmost", True)
         self._win.grab_set()
