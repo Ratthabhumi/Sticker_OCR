@@ -19,6 +19,7 @@ ENV/
 #  PyInstaller
 # ============================================================
 build/
+build_obf/
 dist/
 *.spec
 FolderCreator.zip
