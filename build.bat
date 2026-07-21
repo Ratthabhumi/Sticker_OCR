@@ -33,6 +33,13 @@ pyinstaller ^
   --collect-all "customtkinter" ^
   main.py
 
+REM Automatically create Sticker, Processed, Failed, and Logs folders inside dist\FolderCreator\
+if exist "dist\FolderCreator\" (
+    mkdir "dist\FolderCreator\Sticker\Processed" >nul 2>&1
+    mkdir "dist\FolderCreator\Sticker\Failed" >nul 2>&1
+    mkdir "dist\FolderCreator\Logs" >nul 2>&1
+)
+
 echo.
 echo  ============================================
 echo   Done! Output: dist\FolderCreator\
