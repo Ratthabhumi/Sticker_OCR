@@ -271,16 +271,21 @@ class AppViewModel:
     def _wait_for_usb(self, job: ProcessingJob, timeout: float = 300.0) -> bool:
         waited = 0.0
         step = 1.0
-        while self._usb_path is None:
+        while True:
+            if self._usb_path is not None:
+                try:
+                    if self._usb_path.exists():
+                        return True
+                except Exception:
+                    pass
             if waited == 0.0:
-                logger.warning("USB not present — waiting (up to %.0fs)", timeout)
+                logger.warning("USB not present or not ready — waiting (up to %.0fs)", timeout)
                 self.notify(Event.USB_STATUS_CHANGED, None)
             self._preview_event.wait(timeout=step)  # reuse event object for sleep
             waited += step
             if waited >= timeout:
                 self._fail(job, JobStatus.USB_MISSING, "USB not inserted within timeout")
                 return False
-        return True
 
     def _fail(self, job: ProcessingJob, status: JobStatus, message: str) -> None:
         job.status = status
