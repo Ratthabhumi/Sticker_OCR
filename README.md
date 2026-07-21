@@ -26,12 +26,12 @@
 
 ```mermaid
 graph TD
-    A[Insert USB Drive] --> B[Drop sticker image into Sticker/ folder]
-    B --> C[RapidOCR extracts S/N and Device ID]
-    C --> D[Preview Dialog opens for verification]
-    D -->|Click Confirm| E[Create folder USB:\<SN>(<ID>)\Picture\]
-    E --> F[Move image to Sticker/Processed/]
-    D -->|Click Skip| G[Move image to Sticker/Failed/]
+    A["Insert USB Drive"] --> B["Drop sticker image into Sticker/ folder"]
+    B --> C["RapidOCR extracts S/N and Device ID"]
+    C --> D["Preview Dialog opens for verification"]
+    D -->|Click Confirm| E["Create folder USB:\SN(ID)\Picture\"]
+    E --> F["Move image to Sticker/Processed/"]
+    D -->|Click Skip| G["Move image to Sticker/Failed/"]
 ```
 
 ---
