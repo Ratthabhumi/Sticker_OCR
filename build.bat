@@ -21,18 +21,15 @@ pyinstaller ^
   --windowed ^
   --name "FolderCreator" ^
   --add-data "config.json;." ^
-  --hidden-import "paddleocr" ^
-  --hidden-import "paddle" ^
-  --hidden-import "sklearn" ^
-  --hidden-import "skimage" ^
-  --hidden-import "scipy" ^
+  --hidden-import "rapidocr_onnxruntime" ^
+  --hidden-import "onnxruntime" ^
   --hidden-import "cv2" ^
   --hidden-import "PIL" ^
   --hidden-import "customtkinter" ^
   --hidden-import "watchdog.observers.winapi" ^
   --hidden-import "winotify" ^
-  --collect-all "paddleocr" ^
-  --collect-all "paddle" ^
+  --collect-all "rapidocr_onnxruntime" ^
+  --collect-all "onnxruntime" ^
   --collect-all "customtkinter" ^
   main.py
 
