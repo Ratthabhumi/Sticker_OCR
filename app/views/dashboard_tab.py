@@ -301,13 +301,13 @@ class PreviewDialog:
         )
         self._folder_label.grid(row=2, column=1, sticky="w", pady=(8, 4))
 
-        self._update_folder()
-
-        # Validation message
+        # Validation message — must exist before _update_folder() is called
         self._val_label = ctk.CTkLabel(
             self._win, text="", font=ctk.CTkFont(size=11), text_color="#ef4444"
         )
         self._val_label.pack(pady=(2, 0))
+
+        self._update_folder()
 
         # Buttons
         btn_row = ctk.CTkFrame(self._win, fg_color="transparent")

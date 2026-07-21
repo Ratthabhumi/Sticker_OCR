@@ -9,20 +9,29 @@ from app.services.validator import extract_serial_number, extract_device_id
 
 logger = logging.getLogger(__name__)
 
+# None = not yet initialised; False = init failed (avoid retrying each rotation pass)
 _paddle_ocr = None
+_paddle_ocr_failed = False
 
 
-def _get_ocr(language: str, use_gpu: bool):
-    global _paddle_ocr
+def _get_ocr(language: str):
+    global _paddle_ocr, _paddle_ocr_failed
+    if _paddle_ocr_failed:
+        return None
     if _paddle_ocr is None:
         from paddleocr import PaddleOCR
-        logger.info("Initialising PaddleOCR (lang=%s, gpu=%s)", language, use_gpu)
-        _paddle_ocr = PaddleOCR(
-            use_angle_cls=True,
-            lang=language,
-            use_gpu=use_gpu,
-            show_log=False,
-        )
+        logger.info("Initialising PaddleOCR (lang=%s)", language)
+        try:
+            # PaddleOCR v3.x — minimal constructor (no use_angle_cls / use_gpu / show_log)
+            _paddle_ocr = PaddleOCR(lang=language)
+        except Exception:
+            try:
+                # PaddleOCR v2.x fallback
+                _paddle_ocr = PaddleOCR(use_angle_cls=True, lang=language, show_log=False)
+            except Exception:
+                logger.exception("PaddleOCR initialisation failed")
+                _paddle_ocr_failed = True
+                return None
     return _paddle_ocr
 
 
@@ -35,19 +44,18 @@ def run_ocr(image: np.ndarray, language: str = "en", use_gpu: bool = False) -> O
     best_result = OCRResult()
 
     for idx, rot_img in enumerate(rotations):
-        res = _single_pass_ocr(rot_img, language, use_gpu)
-        logger.info("OCR Pass %d (rotation %d°): SN=%s, ID=%s", idx + 1, idx * 90, res.serial_number, res.device_id)
+        res = _single_pass_ocr(rot_img, language)
+        logger.info("OCR Pass %d (%d deg): SN=%s, ID=%s", idx + 1, idx * 90, res.serial_number, res.device_id)
 
         if res.is_complete:
             return res
 
-        # Keep best partial result
         if res.serial_number and not best_result.serial_number:
             best_result.serial_number = res.serial_number
         if res.device_id and not best_result.device_id:
             best_result.device_id = res.device_id
         if res.raw_text:
-            best_result.raw_text += f"\n--- Rotation {idx * 90}° ---\n" + res.raw_text
+            best_result.raw_text += f"\n--- {idx * 90}deg ---\n" + res.raw_text
 
         if best_result.is_complete:
             return best_result
@@ -55,30 +63,60 @@ def run_ocr(image: np.ndarray, language: str = "en", use_gpu: bool = False) -> O
     return best_result
 
 
-def _single_pass_ocr(image: np.ndarray, language: str, use_gpu: bool) -> OCRResult:
+def _single_pass_ocr(image: np.ndarray, language: str) -> OCRResult:
+    ocr = _get_ocr(language)
+    if ocr is None:
+        return OCRResult()
+
     try:
-        ocr = _get_ocr(language, use_gpu)
-        results = ocr.ocr(image, cls=True)
+        raw = ocr.ocr(image, cls=True)
     except Exception:
-        logger.exception("PaddleOCR execution failed")
-        return OCRResult()
+        try:
+            # v3.x may use predict() instead of ocr()
+            raw = ocr.predict(image)
+        except Exception:
+            logger.exception("PaddleOCR inference failed")
+            return OCRResult()
 
-    if not results or not results[0]:
+    lines = _parse_raw_results(raw)
+    if not lines:
         return OCRResult()
-
-    lines: list[str] = []
-    for item in results[0]:
-        if item and len(item) >= 2:
-            text, _conf = item[1]
-            lines.append(str(text))
 
     full_text = "\n".join(lines)
-
     return OCRResult(
         serial_number=_find_serial_number(lines),
         device_id=_find_device_id(lines),
         raw_text=full_text,
     )
+
+
+def _parse_raw_results(raw) -> list[str]:
+    """Parse PaddleOCR output robustly across v2.x and v3.x formats."""
+    lines: list[str] = []
+    if not raw:
+        return lines
+
+    # Flatten one level if results is [[...]] (v2 wraps in outer list)
+    items = raw[0] if (isinstance(raw, list) and raw and isinstance(raw[0], list)) else raw
+
+    for item in items:
+        if not item:
+            continue
+        # v2.x: [bbox, (text, conf)]
+        if isinstance(item, (list, tuple)) and len(item) >= 2:
+            text_part = item[1]
+            if isinstance(text_part, (list, tuple)) and len(text_part) >= 1:
+                lines.append(str(text_part[0]))
+                continue
+            if isinstance(text_part, str):
+                lines.append(text_part)
+                continue
+        # v3.x: dict with rec_text / text keys
+        if isinstance(item, dict):
+            text = item.get("rec_text") or item.get("text") or ""
+            if text:
+                lines.append(str(text))
+    return lines
 
 
 def _clean_ocr_confusion(text: str) -> str:
