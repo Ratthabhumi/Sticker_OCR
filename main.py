@@ -1,11 +1,14 @@
 """
 Disk Sanitization Assistant — Entry point.
 """
+import os
 import sys
 import logging
 import datetime
 from pathlib import Path
 
+# Always run relative to this script's directory so paths like "Sticker/" resolve correctly
+os.chdir(Path(__file__).parent)
 sys.path.insert(0, str(Path(__file__).parent))
 
 from app.config import AppConfig
