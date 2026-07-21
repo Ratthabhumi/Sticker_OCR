@@ -2,7 +2,7 @@
 title Building FolderCreator.exe
 echo.
 echo  ============================================
-echo   Building FolderCreator.exe (onedir mode)
+echo   Building FolderCreator.exe
 echo  ============================================
 echo.
 
@@ -38,7 +38,6 @@ pyinstaller ^
 
 echo.
 echo  ============================================
-echo   Done!  Output: dist\FolderCreator\
-echo   Copy the entire FolderCreator\ folder.
+echo   Done! Output: dist\FolderCreator\
 echo  ============================================
 pause
