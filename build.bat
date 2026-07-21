@@ -32,8 +32,30 @@ pyinstaller ^
   --onedir ^
   --windowed ^
   --name "FolderCreator" ^
+  --paths "build_obf" ^
   --add-data "config.json;." ^
+  --add-data "build_obf\app;app" ^
   --add-data "build_obf\pyarmor_runtime_000000;pyarmor_runtime_000000" ^
+  --hidden-import "app" ^
+  --hidden-import "app.config" ^
+  --hidden-import "app.constants" ^
+  --hidden-import "app.models.job" ^
+  --hidden-import "app.models.result" ^
+  --hidden-import "app.services.crop_service" ^
+  --hidden-import "app.services.folder_service" ^
+  --hidden-import "app.services.logger_service" ^
+  --hidden-import "app.services.notifier" ^
+  --hidden-import "app.services.ocr_engine" ^
+  --hidden-import "app.services.queue_service" ^
+  --hidden-import "app.services.usb_monitor" ^
+  --hidden-import "app.services.validator" ^
+  --hidden-import "app.services.watch_service" ^
+  --hidden-import "app.viewmodels.app_viewmodel" ^
+  --hidden-import "app.views.dashboard_tab" ^
+  --hidden-import "app.views.history_tab" ^
+  --hidden-import "app.views.large_display_window" ^
+  --hidden-import "app.views.main_window" ^
+  --hidden-import "app.views.settings_tab" ^
   --hidden-import "rapidocr_onnxruntime" ^
   --hidden-import "onnxruntime" ^
   --hidden-import "cv2" ^
