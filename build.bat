@@ -68,15 +68,17 @@ pyinstaller ^
   --collect-all "customtkinter" ^
   build_obf\main.py
 
-echo  [3/3] Setting up distribution folders...
+echo  [3/3] Setting up distribution folders and zipping package...
 if exist "dist\FolderCreator\" (
     mkdir "dist\FolderCreator\Sticker\Processed" >nul 2>&1
     mkdir "dist\FolderCreator\Sticker\Failed" >nul 2>&1
     mkdir "dist\FolderCreator\Logs" >nul 2>&1
+    python -c "import shutil; shutil.make_archive('FolderCreator', 'zip', 'dist', 'FolderCreator')" >nul 2>&1
 )
 
 echo.
 echo  ============================================
-echo   Done! Obfuscated Executable: dist\FolderCreator\
+echo   Done! Executable: dist\FolderCreator\
+echo   Archive created: FolderCreator.zip
 echo  ============================================
 pause
