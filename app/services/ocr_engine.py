@@ -1,9 +1,10 @@
 import logging
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 
 from app.models.result import OCRResult
+from app.services.crop_service import get_image_rotations
 from app.services.validator import extract_serial_number, extract_device_id
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,35 @@ def _get_ocr(language: str, use_gpu: bool):
 
 
 def run_ocr(image: np.ndarray, language: str = "en", use_gpu: bool = False) -> OCRResult:
-    """Run PaddleOCR on a numpy image; return extracted S/N and ID."""
+    """Run PaddleOCR with multi-orientation scan until both S/N and ID are extracted."""
+    if image is None:
+        return OCRResult()
+
+    rotations = get_image_rotations(image)
+    best_result = OCRResult()
+
+    for idx, rot_img in enumerate(rotations):
+        res = _single_pass_ocr(rot_img, language, use_gpu)
+        logger.info("OCR Pass %d (rotation %d°): SN=%s, ID=%s", idx + 1, idx * 90, res.serial_number, res.device_id)
+
+        if res.is_complete:
+            return res
+
+        # Keep best partial result
+        if res.serial_number and not best_result.serial_number:
+            best_result.serial_number = res.serial_number
+        if res.device_id and not best_result.device_id:
+            best_result.device_id = res.device_id
+        if res.raw_text:
+            best_result.raw_text += f"\n--- Rotation {idx * 90}° ---\n" + res.raw_text
+
+        if best_result.is_complete:
+            return best_result
+
+    return best_result
+
+
+def _single_pass_ocr(image: np.ndarray, language: str, use_gpu: bool) -> OCRResult:
     try:
         ocr = _get_ocr(language, use_gpu)
         results = ocr.ocr(image, cls=True)
@@ -35,7 +64,6 @@ def run_ocr(image: np.ndarray, language: str = "en", use_gpu: bool = False) -> O
         return OCRResult()
 
     if not results or not results[0]:
-        logger.warning("PaddleOCR returned empty result")
         return OCRResult()
 
     lines: list[str] = []
@@ -45,7 +73,6 @@ def run_ocr(image: np.ndarray, language: str = "en", use_gpu: bool = False) -> O
             lines.append(str(text))
 
     full_text = "\n".join(lines)
-    logger.debug("OCR raw output:\n%s", full_text)
 
     return OCRResult(
         serial_number=_find_serial_number(lines),
@@ -54,11 +81,18 @@ def run_ocr(image: np.ndarray, language: str = "en", use_gpu: bool = False) -> O
     )
 
 
+def _clean_ocr_confusion(text: str) -> str:
+    """Clean common OCR typos (e.g., 'O' vs '0', 'I' vs '1')."""
+    text = text.upper().strip()
+    text = text.replace(" ", "").replace("—", "-").replace("–", "-")
+    return text
+
+
 def _find_serial_number(lines: list[str]) -> Optional[str]:
     for i, line in enumerate(lines):
         upper = line.upper().strip()
-        if "S/N" in upper or upper.startswith("SN"):
-            inline = upper.replace("S/N:", "").replace("S/N", "").strip()
+        if "S/N" in upper or "SN" in upper or "SERIAL" in upper:
+            inline = upper.replace("S/N:", "").replace("S/N", "").replace("SN:", "").replace("SN", "").strip()
             sn = extract_serial_number(inline)
             if sn:
                 return sn
@@ -77,11 +111,12 @@ def _find_serial_number(lines: list[str]) -> Optional[str]:
 def _find_device_id(lines: list[str]) -> Optional[str]:
     for i, line in enumerate(lines):
         upper = line.upper().strip()
-        if "ID NO" in upper or "ID:" in upper:
+        if "ID NO" in upper or "ID:" in upper or "ID" in upper:
             inline = (
                 upper.replace("ID NO.", "")
                 .replace("ID NO", "")
                 .replace("ID:", "")
+                .replace("ID", "")
                 .strip()
             )
             did = extract_device_id(inline)
@@ -97,3 +132,4 @@ def _find_device_id(lines: list[str]) -> Optional[str]:
         if did:
             return did
     return None
+
