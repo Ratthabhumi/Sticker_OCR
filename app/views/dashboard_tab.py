@@ -15,8 +15,58 @@ from app.viewmodels.app_viewmodel import AppViewModel
 
 logger = logging.getLogger(__name__)
 
-_PREVIEW_W = 680
-_PREVIEW_H = 420
+_PREVIEW_W = 760
+_PREVIEW_H = 480
+
+
+class ImageZoomWindow:
+    """Modal window to view the sticker photo in full resolution / zoomed scale."""
+
+    def __init__(self, parent, image_path: Path) -> None:
+        self._win = ctk.CTkToplevel(parent)
+        self._win.title(f"🔍 Zoom Image — {image_path.name} (ESC to close)")
+        self._win.geometry("1100x850")
+        self._win.attributes("-topmost", True)
+        self._win.grab_set()
+
+        self._win.bind("<Escape>", lambda _e: self._win.destroy())
+
+        ctk.CTkLabel(
+            self._win,
+            text=f"🔍  {image_path.name}  ·  Press ESC or click anywhere to close",
+            font=ctk.CTkFont(size=13),
+            text_color="#888888",
+        ).pack(pady=(10, 4))
+
+        self._label = ctk.CTkLabel(self._win, text="")
+        self._label.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        self._label.bind("<Button-1>", lambda _e: self._win.destroy())
+
+        try:
+            from app.services.crop_service import read_image_safe
+            img_cv = read_image_safe(image_path)
+            if img_cv is None:
+                img_cv = cv2.imread(str(image_path))
+
+            if img_cv is not None:
+                img_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
+                self._pil_img = PILImage.fromarray(img_rgb)
+            else:
+                self._pil_img = None
+        except Exception:
+            self._pil_img = None
+
+        self._win.bind("<Configure>", self._on_resize)
+
+    def _on_resize(self, event) -> None:
+        if not self._pil_img or event.widget != self._win:
+            return
+        w = max(100, event.width - 32)
+        h = max(100, event.height - 60)
+        copy_img = self._pil_img.copy()
+        copy_img.thumbnail((w, h), PILImage.LANCZOS)
+        ctk_img = ctk.CTkImage(light_image=copy_img, dark_image=copy_img, size=copy_img.size)
+        self._label.configure(image=ctk_img, text="")
 
 
 class DashboardTab:
@@ -249,8 +299,9 @@ class PreviewDialog:
 
         self._win = ctk.CTkToplevel(parent)
         self._win.title("Preview — Confirm OCR Result")
-        self._win.geometry("780x790")
-        self._win.resizable(False, False)
+        self._win.geometry("880x880")
+        self._win.minsize(700, 700)
+        self._win.resizable(True, True)
         self._win.attributes("-topmost", True)
         self._win.grab_set()
 
@@ -260,18 +311,37 @@ class PreviewDialog:
         self._win.focus_force()
 
     def _build(self, job: ProcessingJob, ocr: OCRResult) -> None:
-        # Image preview
-        self._img_label = ctk.CTkLabel(self._win, text="", width=_PREVIEW_W, height=_PREVIEW_H)
-        self._img_label.pack(padx=20, pady=(12, 4))
+        self._job = job
+        # Image preview frame
+        img_container = ctk.CTkFrame(self._win, fg_color="transparent")
+        img_container.pack(fill="both", expand=True, padx=16, pady=(12, 4))
+
+        self._img_label = ctk.CTkLabel(img_container, text="", width=_PREVIEW_W, height=_PREVIEW_H)
+        self._img_label.pack(fill="both", expand=True)
+        self._img_label.bind("<Button-1>", lambda _e: ImageZoomWindow(self._win, job.image_path))
         self._load_preview_image(job.image_path)
 
-        # Filename label
+        # Filename label & Zoom hint
+        info_row = ctk.CTkFrame(self._win, fg_color="transparent")
+        info_row.pack(fill="x", padx=28, pady=(0, 4))
+
         ctk.CTkLabel(
-            self._win,
-            text=job.image_path.name,
+            info_row,
+            text=f"📄  {job.image_path.name}",
             font=ctk.CTkFont(size=12),
             text_color="#888888",
-        ).pack(pady=(0, 4))
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            info_row,
+            text="🔍  Zoom Image",
+            command=lambda: ImageZoomWindow(self._win, job.image_path),
+            fg_color="#1f2937", hover_color="#374151",
+            text_color="#60a5fa",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            height=26,
+            width=110,
+        ).pack(side="right")
 
         # Fields
         fields_frame = ctk.CTkFrame(self._win, fg_color="transparent")
