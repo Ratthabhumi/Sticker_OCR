@@ -15,8 +15,8 @@ from app.viewmodels.app_viewmodel import AppViewModel
 
 logger = logging.getLogger(__name__)
 
-_PREVIEW_W = 420
-_PREVIEW_H = 260
+_PREVIEW_W = 680
+_PREVIEW_H = 420
 
 
 class DashboardTab:
@@ -249,7 +249,7 @@ class PreviewDialog:
 
         self._win = ctk.CTkToplevel(parent)
         self._win.title("Preview — Confirm OCR Result")
-        self._win.geometry("560x580")
+        self._win.geometry("780x790")
         self._win.resizable(False, False)
         self._win.attributes("-topmost", True)
         self._win.grab_set()
@@ -262,20 +262,20 @@ class PreviewDialog:
     def _build(self, job: ProcessingJob, ocr: OCRResult) -> None:
         # Image preview
         self._img_label = ctk.CTkLabel(self._win, text="", width=_PREVIEW_W, height=_PREVIEW_H)
-        self._img_label.pack(padx=20, pady=(16, 8))
+        self._img_label.pack(padx=20, pady=(12, 4))
         self._load_preview_image(job.image_path)
 
         # Filename label
         ctk.CTkLabel(
             self._win,
             text=job.image_path.name,
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12),
             text_color="#888888",
-        ).pack()
+        ).pack(pady=(0, 4))
 
         # Fields
         fields_frame = ctk.CTkFrame(self._win, fg_color="transparent")
-        fields_frame.pack(fill="x", padx=24, pady=(12, 0))
+        fields_frame.pack(fill="x", padx=28, pady=(4, 0))
         fields_frame.columnconfigure(1, weight=1)
 
         self._sn_var = ctk.StringVar(value=ocr.serial_number or "")
@@ -289,13 +289,14 @@ class PreviewDialog:
         self._make_field(fields_frame, 1, "ID No.:", self._id_var, "#a78bfa")
 
         ctk.CTkLabel(
-            fields_frame, text="Folder:", anchor="w", width=80
+            fields_frame, text="Folder:", anchor="w", width=90,
+            font=ctk.CTkFont(size=15, weight="bold")
         ).grid(row=2, column=0, sticky="w", pady=(8, 4))
 
         self._folder_label = ctk.CTkLabel(
             fields_frame,
             textvariable=self._folder_var,
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=ctk.CTkFont(size=18, weight="bold"),
             text_color="#f0f0f0",
             anchor="w",
         )
@@ -303,7 +304,7 @@ class PreviewDialog:
 
         # Validation message — must exist before _update_folder() is called
         self._val_label = ctk.CTkLabel(
-            self._win, text="", font=ctk.CTkFont(size=11), text_color="#ef4444"
+            self._win, text="", font=ctk.CTkFont(size=12), text_color="#ef4444"
         )
         self._val_label.pack(pady=(2, 0))
 
@@ -317,30 +318,37 @@ class PreviewDialog:
             btn_row, text="✅  Confirm",
             command=self._confirm,
             fg_color="#16a34a", hover_color="#15803d",
-            font=ctk.CTkFont(size=13, weight="bold"),
-            width=130,
-        ).pack(side="left", padx=(0, 12))
+            font=ctk.CTkFont(size=15, weight="bold"),
+            height=42,
+            width=160,
+        ).pack(side="left", padx=(0, 16))
 
         ctk.CTkButton(
             btn_row, text="⏭  Skip",
             command=self._skip,
             fg_color="#374151", hover_color="#4b5563",
-            width=100,
+            font=ctk.CTkFont(size=15),
+            height=42,
+            width=120,
         ).pack(side="left")
 
     @staticmethod
     def _make_field(
         parent: ctk.CTkFrame, row: int, label: str, var: ctk.StringVar, accent: str
     ) -> None:
-        ctk.CTkLabel(parent, text=label, anchor="w", width=80).grid(
+        ctk.CTkLabel(
+            parent, text=label, anchor="w", width=90,
+            font=ctk.CTkFont(size=15, weight="bold")
+        ).grid(
             row=row, column=0, sticky="w", pady=4
         )
         entry = ctk.CTkEntry(
             parent,
             textvariable=var,
-            font=ctk.CTkFont(family="Consolas", size=16),
+            font=ctk.CTkFont(family="Consolas", size=20, weight="bold"),
             border_color=accent,
             border_width=2,
+            height=40,
         )
         entry.grid(row=row, column=1, sticky="ew", padx=(8, 0), pady=4)
 
