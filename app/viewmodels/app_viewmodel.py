@@ -245,7 +245,8 @@ class AppViewModel:
                 img = crop_sticker(job.image_path, self._config.crop_padding)
                 if img is not None:
                     return img
-            return cv2.imread(str(job.image_path))
+            from app.services.crop_service import read_image_safe
+            return read_image_safe(job.image_path)
         except Exception:
             logger.exception("Error loading image: %s", job.image_path)
             return None
@@ -302,22 +303,33 @@ class AppViewModel:
 
     def _move_image(self, job: ProcessingJob) -> None:
         if job.status in (JobStatus.SUCCESS, JobStatus.DUPLICATE):
-            dest_dir = self._config.resolved_processed_folder
+            dest_dir = self._config.resolved_processed_folder.resolve()
         else:
-            dest_dir = self._config.resolved_failed_folder
+            dest_dir = self._config.resolved_failed_folder.resolve()
 
         dest_dir.mkdir(parents=True, exist_ok=True)
-        dest = dest_dir / job.image_path.name
+        src_path = job.image_path.resolve()
 
+        if not src_path.exists():
+            logger.warning("Source image missing before move: %s", src_path)
+            return
+
+        dest = dest_dir / src_path.name
         if dest.exists():
             stem, suffix = dest.stem, dest.suffix
             dest = dest_dir / f"{stem}_{datetime.now().strftime('%H%M%S')}{suffix}"
 
-        try:
-            shutil.move(str(job.image_path), str(dest))
-            logger.info("Moved %s → %s/", job.image_path.name, dest_dir.name)
-        except OSError as exc:
-            logger.error("Failed to move image: %s", exc)
+        # Retry moving in case file handle is held briefly by another process (LINE/OS)
+        for attempt in range(5):
+            try:
+                shutil.move(str(src_path), str(dest))
+                logger.info("Moved %s → %s/", src_path.name, dest_dir.name)
+                return
+            except OSError as exc:
+                if attempt == 4:
+                    logger.error("Failed to move image after retries: %s — %s", src_path, exc)
+                else:
+                    threading.Event().wait(0.3)
 
     def _ensure_dirs(self) -> None:
         for folder in (

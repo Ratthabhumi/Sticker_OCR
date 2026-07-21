@@ -20,11 +20,11 @@ class _ImageHandler(FileSystemEventHandler):
 
     def on_created(self, event: FileCreatedEvent) -> None:
         if not event.is_directory:
-            self._dispatch(Path(event.src_path))
+            self._dispatch(Path(event.src_path).resolve())
 
     def on_moved(self, event: FileMovedEvent) -> None:
         if not event.is_directory:
-            self._dispatch(Path(event.dest_path))
+            self._dispatch(Path(event.dest_path).resolve())
 
     def _dispatch(self, path: Path) -> None:
         if path.suffix.lower() not in SUPPORTED_IMAGE_EXTENSIONS:
