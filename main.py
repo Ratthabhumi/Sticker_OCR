@@ -7,9 +7,14 @@ import logging
 import datetime
 from pathlib import Path
 
-# Always run relative to this script's directory so paths like "Sticker/" resolve correctly
-os.chdir(Path(__file__).parent)
-sys.path.insert(0, str(Path(__file__).parent))
+# Determine actual root directory (exe location if frozen by PyInstaller, script dir if raw python)
+if getattr(sys, "frozen", False):
+    app_dir = Path(sys.executable).parent.resolve()
+else:
+    app_dir = Path(__file__).parent.resolve()
+
+os.chdir(app_dir)
+sys.path.insert(0, str(app_dir))
 
 from app.config import AppConfig
 from app.viewmodels.app_viewmodel import AppViewModel

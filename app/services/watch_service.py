@@ -39,24 +39,48 @@ class _ImageHandler(FileSystemEventHandler):
 
 class WatchService:
     def __init__(self, watch_folder: Path, callback: Callable[[Path], None]) -> None:
-        self._folder = watch_folder
+        self._folder = watch_folder.resolve()
         self._handler = _ImageHandler(callback)
         self._observer: Optional[Observer] = None
+        self._poll_thread: Optional[threading.Thread] = None
+        self._stop = threading.Event()
 
     def start(self) -> None:
         self._folder.mkdir(parents=True, exist_ok=True)
         self._observer = Observer()
         self._observer.schedule(self._handler, str(self._folder), recursive=False)
         self._observer.start()
-        logger.info("Watching: %s", self._folder)
+
+        self._stop.clear()
+        self._poll_thread = threading.Thread(
+            target=self._poll_loop, daemon=True, name="FolderPoller"
+        )
+        self._poll_thread.start()
+        logger.info("Watching folder: %s", self._folder)
 
     def stop(self) -> None:
+        self._stop.set()
         if self._observer:
             self._observer.stop()
             self._observer.join()
+        if self._poll_thread:
+            self._poll_thread.join(timeout=2)
 
     def scan_existing(self) -> list[Path]:
+        if not self._folder.exists():
+            return []
         return [
-            p for p in self._folder.iterdir()
+            p.resolve()
+            for p in self._folder.iterdir()
             if p.is_file() and p.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS
         ]
+
+    def _poll_loop(self) -> None:
+        """Periodic fallback scan every 2 seconds in case watchdog misses OS file events."""
+        while not self._stop.is_set():
+            try:
+                for img in self.scan_existing():
+                    self._handler._dispatch(img)
+            except Exception as exc:
+                logger.debug("Polling loop error: %s", exc)
+            self._stop.wait(timeout=2.0)
