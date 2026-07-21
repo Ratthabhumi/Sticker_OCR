@@ -12,6 +12,60 @@ logger = logging.getLogger(__name__)
 _POLL_INTERVAL = 1.0
 
 
+def _is_usb_device(mountpoint: str) -> bool:
+    """Return True if drive is a USB Flash Drive or connected via USB bus."""
+    clean = mountpoint.rstrip("\\").upper()
+    if not hasattr(ctypes, "windll"):
+        return True
+
+    try:
+        dt = ctypes.windll.kernel32.GetDriveTypeW(clean + "\\")
+        if dt == 2:  # DRIVE_REMOVABLE (USB Flash Drives / DiskDeleter USB)
+            return True
+        if dt != 3:  # Skip Network (4) and CD-ROM (5)
+            return False
+
+        # For DRIVE_FIXED (3), check if Storage Bus Type is USB (BusTypeUsb = 7)
+        # to filter out internal hard drive partitions (D:\, E:\, etc.)
+        from ctypes import wintypes
+
+        handle = ctypes.windll.kernel32.CreateFileW(
+            f"\\\\.\\{clean}",
+            0,
+            1 | 2,  # FILE_SHARE_READ | FILE_SHARE_WRITE
+            None,
+            3,  # OPEN_EXISTING
+            0,
+            None,
+        )
+        if handle in (-1, 0, 4294967295):
+            return False
+
+        try:
+            query = (ctypes.c_byte * 12)(0)
+            output = (ctypes.c_byte * 1024)(0)
+            bytes_ret = wintypes.DWORD()
+            res = ctypes.windll.kernel32.DeviceIoControl(
+                handle,
+                0x002D1400,  # IOCTL_STORAGE_QUERY_PROPERTY
+                query,
+                len(query),
+                output,
+                len(output),
+                ctypes.byref(bytes_ret),
+                None,
+            )
+            if res and bytes_ret.value >= 29:
+                bus_type = output[28]
+                return bus_type == 7  # 7 = BusTypeUsb
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
+    except Exception as exc:
+        logger.debug("USB bus check failed for %s: %s", clean, exc)
+
+    return False
+
+
 class USBMonitor:
     def __init__(
         self,
@@ -40,7 +94,14 @@ class USBMonitor:
 
     def get_current(self) -> Optional[Path]:
         drives = self._removable_drives()
-        return Path(next(iter(drives))) if drives else None
+        if not drives:
+            return None
+        # Sort so DRIVE_REMOVABLE (Flash drives) come before external fixed HDDs
+        sorted_drives = sorted(
+            drives,
+            key=lambda d: 0 if ctypes.windll.kernel32.GetDriveTypeW(d) == 2 else 1
+        )
+        return Path(sorted_drives[0])
 
     def _loop(self) -> None:
         while not self._stop.is_set():
@@ -72,27 +133,12 @@ class USBMonitor:
         try:
             for part in psutil.disk_partitions(all=False):
                 mount = part.mountpoint.upper()
-                opts = part.opts.lower()
 
                 # Skip system drive (C:\) and app drive
                 if mount.startswith(system_drive) or mount.startswith(app_drive):
                     continue
 
-                # Check Windows Drive Type API
-                if hasattr(ctypes, "windll"):
-                    try:
-                        dt = ctypes.windll.kernel32.GetDriveTypeW(part.mountpoint)
-                        # 2 = DRIVE_REMOVABLE, 3 = DRIVE_FIXED, 4 = DRIVE_REMOTE, 5 = DRIVE_CDROM
-                        if dt in (4, 5):  # Skip network & CD-ROM
-                            continue
-                        if dt in (2, 3):  # Accept Removable & External USB Drives (F:\, H:\, etc.)
-                            result.add(part.mountpoint)
-                            continue
-                    except Exception:
-                        pass
-
-                # Fallback checks
-                if "removable" in opts or part.fstype.upper() in {"FAT32", "EXFAT", "FAT", "NTFS"}:
+                if _is_usb_device(part.mountpoint):
                     result.add(part.mountpoint)
         except Exception:
             logger.exception("Failed to enumerate disk partitions")
