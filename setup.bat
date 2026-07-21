@@ -24,6 +24,7 @@ if not exist ".venv\" (
 REM Activate and install
 echo  Installing dependencies (this may take a few minutes)...
 call .venv\Scripts\activate.bat
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 
 echo.
