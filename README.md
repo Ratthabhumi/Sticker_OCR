@@ -5,81 +5,81 @@
 [![Release](https://img.shields.io/badge/Release-v1.0.0-green.svg)](https://github.com/Ratthabhumi/Sticker_OCR/releases/tag/v1.0.0)
 [![OCR Engine](https://img.shields.io/badge/OCR-RapidOCR%20(ONNX)-orange.svg)](https://github.com/RapidAI/RapidOCR)
 
-**Disk Sanitization Assistant** คือโปรแกรมช่วยอำนวยความสะดวกสำหรับกระบวนการล้างข้อมูลเครื่องคอมพิวเตอร์โน้ตบุ๊ก (Disk Sanitization) โดยจะเฝ้าดูรูปถ่ายสติ๊กเกอร์เครื่อง และสแกนหา **Serial Number (S/N)** กับ **Device ID (ID No.)** ด้วยระบบ **RapidOCR (ONNX Runtime)** แบบความเร็วสูง เพื่อสร้างโฟลเดอร์ปลายทาง `USB:\<SN>(<ID>)\Picture\` บน Flashdrive / USB External Drive อัตโนมัติทันที
+**Disk Sanitization Assistant** is a desktop application designed to streamline the laptop disk sanitization workflow. It monitors sticker photos of laptop units, automatically extracts the **Serial Number (S/N)** and **Device ID (ID No.)** using **RapidOCR (ONNX Runtime)**, and creates the required destination folder structure `USB:\<SN>(<ID>)\Picture\` on targeted USB drives.
 
 ---
 
-## ✨ Features (คุณสมบัติเด่น)
+## ✨ Key Features
 
-- ⚡ **High-Speed ONNX OCR Engine:** ใช้ RapidOCR สแกนตัวอักษรภาษาอังกฤษและตัวเลขแม่นยำสูง รวดเร็ว ไม่ต้องลง C++ Runtime หรือโปรแกรมเสริม
-- 💾 **Smart USB Drive Detection & Manual Select:** สแกนตรวจจับไดร์ฟ USB (เช่น DiskDeleter, Flash Drive, External HDD) อัตโนมัติ พร้อมเมนู Dropdown เลือก Target Drive ด้วยตนเองหากเสียบ USB พร้อมกันหลายตัว
-- 🖼️ **Interactive Preview & Fullscreen Zoom:** แสดงตัวอย่างรูปภาพขนาดใหญ่ (`860x540`) พร้อมปุ่ม Zoom ขยายรูปภาพคมชัดระดับ HD และรองรับการแก้ไขข้อมูล Real-time
-- 🧹 **Real-Time Input Sanitization:** ดักจับและลบอักขระต้องห้ามของระบบปฏิบัติการ Windows (`\ / : * ? " < > |`) ออกจาก S/N และ ID อัตโนมัติ เพื่อป้องกันระบบสร้างโฟลเดอร์พัง
-- 🔒 **File Lock Race Condition Recovery:** มีระบบ Retry Loop เมื่อบันทึกภาพจากโปรแกรมภายนอก (เช่น LINE PC) พร้อมระบบสำรอง Copy-fallback หากไฟล์โดนเปิดค้างไว้
-- 🛡️ **Disk Space Protection:** ตรวจเช็คพื้นที่ว่างบน USB ก่อนสร้างโฟลเดอร์เสมอ (ป้องกันปัญหา Flashdrive พื้นที่เต็ม)
-- 📊 **CSV Audit Logging:** บันทึกประวัติการทำงานประจำวันเป็นไฟล์ CSV ละเอียดในโฟลเดอร์ `Logs/`
-- 🖥️ **Large Display Mode (F11):** โหมดตัวหนังสือยักษ์เต็มหน้าจอสำหรับช่างเทคนิคที่ต้องการมองเห็น S/N และ ID ชัดเจนจากระยะไกล
+- ⚡ **High-Speed ONNX OCR Engine:** Utilizes RapidOCR for fast, accurate text recognition without external C++ or Heavy AI framework dependencies.
+- 💾 **Smart USB Drive Detection & Manual Override:** Automatically detects connected USB Flash Drives and External HDDs, with a live header dropdown selector for manual drive selection when multiple USB devices are connected.
+- 🖼️ **Interactive Preview & High-Res Zoom:** Displays an enlarged preview dialog (`860x540`) with full-screen zoom capabilities (`F11` / Double-click) for HD image verification.
+- 🧹 **Real-Time Input Sanitization:** Automatically strips illegal OS path characters (`\ / : * ? " < > |`) from S/N and ID inputs in real time to prevent folder creation errors.
+- 🔒 **File Lock Race Condition Recovery:** Implements retry loops for image files saved directly from external apps (e.g. LINE PC), featuring a copy-fallback mechanism.
+- 🛡️ **Disk Free Space Safety Check:** Verifies available disk space on the target USB drive before initiating folder creation to avoid disk-full errors.
+- 📊 **CSV Audit Logging:** Automatically logs daily operational history into CSV audit files located in `Logs/`.
+- 🖥️ **Large Display Mode (F11):** High-contrast, large-font fullscreen view for technicians to inspect S/N and ID from a distance.
 
 ---
 
-## 📸 Workflow การทำงาน
+## 📸 Workflow
 
 ```mermaid
 graph TD
-    A[เสียบ USB Flashdrive / External HDD] --> B[วางรูปสติ๊กเกอร์ในโฟลเดอร์ Sticker/]
-    B --> C[RapidOCR สแกน S/N และ ID No.]
-    C --> D[แสดงหน้าต่าง Preview ให้ตรวจสอบความถูกต้อง]
-    D -->|กด Confirm| E[สร้างโฟลเดอร์ USB:\<SN>(<ID>)\Picture\]
-    E --> F[ย้ายรูปไปโฟลเดอร์ Sticker/Processed/]
-    D -->|กด Skip| G[ย้ายรูปไปโฟลเดอร์ Sticker/Failed/]
+    A[Insert USB Drive] --> B[Drop sticker image into Sticker/ folder]
+    B --> C[RapidOCR extracts S/N and Device ID]
+    C --> D[Preview Dialog opens for verification]
+    D -->|Click Confirm| E[Create folder USB:\<SN>(<ID>)\Picture\]
+    E --> F[Move image to Sticker/Processed/]
+    D -->|Click Skip| G[Move image to Sticker/Failed/]
 ```
 
 ---
 
-## 🚀 Quick Download & Running (.exe)
+## 🚀 Download & Usage (.exe)
 
-ไม่ต้องติดตั้ง Python! ดาวน์โหลดแพ็กเกจสำเร็จรูปไปใช้งานได้ทันที:
+No Python installation required. Download the pre-built standalone package:
 
-1. ดาวน์โหลดไฟล์ **`FolderCreator.zip`** จาก [GitHub Releases v1.0.0](https://github.com/Ratthabhumi/Sticker_OCR/releases/tag/v1.0.0)
-2. แตกไฟล์ ZIP ออกมา จะได้โฟลเดอร์ `FolderCreator`
-3. ดับเบิลคลิกเปิดใช้งาน **`FolderCreator.exe`** ได้ทันที
+1. Download **`FolderCreator.zip`** from [GitHub Releases v1.0.0](https://github.com/Ratthabhumi/Sticker_OCR/releases/tag/v1.0.0).
+2. Extract `FolderCreator.zip`.
+3. Launch **`FolderCreator.exe`** to start the application.
 
 ---
 
-## ⌨️ Shortcut Keys (คีย์ลัด)
+## ⌨️ Shortcut Keys
 
 | Key | Action |
 |-----|--------|
-| **F11** | เปิด / ปิด โหมดตัวหนังสือยักษ์เต็มหน้าจอ (Large Display Mode) |
-| **ESC** | ปิดหน้าต่าง Zoom รูปภาพ หรือออกจากโหมดเต็มหน้าจอ |
+| **F11** | Toggle Large Display Mode |
+| **ESC** | Close Zoom Dialog / Exit Large Display Mode |
 
 ---
 
-## 🛠️ Developer Setup (สำหรับนักพัฒนา)
+## 🛠️ Developer Setup
 
-### 1. Prerequisite
-- Python 3.10 ขึ้นไป
+### Prerequisites
 - Windows 10 / 11
+- Python 3.10+
 
-### 2. Installation & Run
+### Installation & Execution
 
 ```powershell
 # Clone repository
 git clone https://github.com/Ratthabhumi/Sticker_OCR.git
 cd Sticker_OCR
 
-# Create and activate virtual environment
+# Setup virtual environment
 python -m venv .venv
 .\.venv\Scripts\activate
 
-# Install requirements
+# Install dependencies
 pip install -r requirements.txt
 
-# Run Application
+# Run application
 python main.py
 ```
 
-### 3. Build Standalone Executable
+### Build Executable
 
 ```powershell
 .\build.bat
@@ -92,33 +92,21 @@ python main.py
 ```
 Sticker_OCR/
 ├── main.py                   # Main Application Entry Point
-├── build.bat                 # Automated PyInstaller Executable Builder
+├── build.bat                 # Automated PyInstaller & PyArmor Build Script
 ├── config.json               # Application Configuration
 ├── requirements.txt          # Dependencies
 ├── app/
-│   ├── config.py             # Config Manager
+│   ├── config.py             # Configuration Manager
 │   ├── constants.py          # App Constants & UI Colors
 │   ├── models/               # Data Models (Job, OCRResult, FolderResult)
 │   ├── services/             # Core Services (OCR Engine, USB Monitor, File Watcher, Validator)
 │   ├── viewmodels/           # MVVM ViewModel State & Logic
-│   └── views/                # UI Views (Main Window, Dashboard, History, Settings, Zoom Dialog)
-├── Sticker/                  # Input Folder for Sticker Images
-│   ├── Processed/            # Successfully processed images
-│   └── Failed/               # Failed / skipped images
-└── Logs/                     # Daily CSV Log files
+│   └── views/                # UI Components (Main Window, Dashboard, History, Settings, Zoom Dialog)
+├── Sticker/                  # Input Directory for Images
+│   ├── Processed/            # Processed Images
+│   └── Failed/               # Failed / Skipped Images
+└── Logs/                     # Daily Audit Logs
 ```
-
----
-
-## 🔒 Code Protection & Reverse Engineering Note
-
-> [!WARNING]
-> **ความปลอดภัยของไฟล์ Executable (.exe):**
-> โปรแกรมนี้ถูกคอมไพล์ด้วย **PyInstaller** ซึ่งเป็นการแพ็กรวม Python Bytecode (`.pyc`) เข้ามาไว้ในชุดโปรแกรม ผู้ใช้งานที่มีความรู้ด้านเทคนิคสามารถใช้เครื่องมือประเภท Decompiler (เช่น `pyinstxtractor` + `pycdc`) ถอดรหัสไฟล์ `.pyc` กลับมาเป็น Python Source Code ได้
-> 
-> หากต้องการป้องกันไม่ให้ผู้อื่นนำซอร์สโค้ดไปพัฒนาต่อหรือคัดลอก Logic โปรแกรม แนะนำให้ใช้โซลูชัน **Code Obfuscation** เช่น:
-> - **[PyArmor](https://github.com/dashingsoft/pyarmor):** แปลงโค้ด Python เป็น Native C Extension (`.pyd`) ก่อนนำไปสร้าง `.exe` (ป้องกันการถอดโค้ดได้ 100%)
-> - **Cython:** คอมไพล์ไฟล์ `.py` ที่สำคัญให้กลายเป็นไดนามิกลิงก์ไลบรารี C (`.pyd`)
 
 ---
 
