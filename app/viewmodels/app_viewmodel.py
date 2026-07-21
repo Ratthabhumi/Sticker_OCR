@@ -41,6 +41,7 @@ class AppViewModel:
         self._listeners: Dict[str, List[Callable]] = {}
 
         self._usb_path: Optional[Path] = None
+        self._manual_usb_path: Optional[Path] = None
         self._history: List[ProcessingJob] = []
         self._stats: Dict[str, int] = {"success": 0, "duplicate": 0, "failed": 0}
 
@@ -96,7 +97,19 @@ class AppViewModel:
 
     @property
     def usb_path(self) -> Optional[Path]:
+        if self._manual_usb_path and self._manual_usb_path.exists():
+            return self._manual_usb_path
         return self._usb_path
+
+    def set_manual_usb_drive(self, path: Optional[Path]) -> None:
+        """Manually override the target USB drive."""
+        self._manual_usb_path = path
+        logger.info("Manual USB drive override: %s", path)
+        self.notify(Event.USB_STATUS_CHANGED, self.usb_path)
+
+    def get_available_usb_drives(self) -> list[Path]:
+        """Return all detected external USB drives."""
+        return self._usb_monitor.get_all_drives()
 
     @property
     def history(self) -> List[ProcessingJob]:

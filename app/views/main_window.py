@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import customtkinter as ctk
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class MainWindow:
-    """Root application window.  Owns the tab layout and the large-display overlay."""
+    """Root application window. Owns the tab layout, USB selector, and large-display overlay."""
 
     def __init__(self, viewmodel: AppViewModel) -> None:
         self._vm = viewmodel
@@ -24,7 +25,7 @@ class MainWindow:
 
         self._root = ctk.CTk()
         self._root.title(f"{APP_NAME}  v{APP_VERSION}")
-        self._root.geometry("1280x780")
+        self._root.geometry("1280x820")
         self._root.minsize(960, 640)
 
         self._build_header()
@@ -49,22 +50,46 @@ class MainWindow:
             anchor="w",
         ).pack(side="left", padx=16)
 
+        # USB Status Pill
         self._usb_pill = ctk.CTkLabel(
             header,
-            text="⚠️ No USB",
-            font=ctk.CTkFont(size=12),
+            text="⚠️  No USB",
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color="#f59e0b",
             anchor="e",
         )
-        self._usb_pill.pack(side="right", padx=16)
+        self._usb_pill.pack(side="right", padx=(8, 16))
+
+        # Manual USB Drive Selector Dropdown
+        self._drive_dropdown = ctk.CTkOptionMenu(
+            header,
+            values=["Auto (Detect)"],
+            command=self._on_drive_selected,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            dropdown_font=ctk.CTkFont(size=12),
+            fg_color="#1f2937",
+            button_color="#374151",
+            button_hover_color="#4b5563",
+            width=140,
+            height=28,
+        )
+        self._drive_dropdown.pack(side="right", padx=8)
+
+        ctk.CTkLabel(
+            header,
+            text="Target Drive:",
+            font=ctk.CTkFont(size=11),
+            text_color="#9ca3af",
+            anchor="e",
+        ).pack(side="right", padx=(8, 0))
 
         ctk.CTkLabel(
             header,
             text="F11 = Large Display  ·  ESC = Exit",
             font=ctk.CTkFont(size=11),
-            text_color="#444444",
+            text_color="#4b5563",
             anchor="e",
-        ).pack(side="right", padx=8)
+        ).pack(side="right", padx=16)
 
         self._vm.subscribe(
             "usb_status_changed",
@@ -96,10 +121,22 @@ class MainWindow:
         self._root.bind("<F11>", self._toggle_large_display)
 
     # ------------------------------------------------------------------ #
-    # Header USB pill                                                     #
+    # Header USB pill & Drive Dropdown                                    #
     # ------------------------------------------------------------------ #
 
-    def _update_usb_pill(self, path) -> None:
+    def _on_drive_selected(self, choice: str) -> None:
+        if choice.startswith("Auto"):
+            self._vm.set_manual_usb_drive(None)
+        else:
+            clean_drive = choice.split()[0].strip()
+            self._vm.set_manual_usb_drive(Path(clean_drive))
+
+    def _update_usb_pill(self, path: Path | None) -> None:
+        # Update dropdown items list
+        drives = self._vm.get_available_usb_drives()
+        options = ["Auto (Detect)"] + [f"{d}" for d in drives]
+        self._drive_dropdown.configure(values=options)
+
         if path:
             self._usb_pill.configure(
                 text=f"💾  {path}",
@@ -112,38 +149,20 @@ class MainWindow:
             )
 
     # ------------------------------------------------------------------ #
-    # Large display                                                       #
+    # Large Display overlay & Shutdown                                   #
     # ------------------------------------------------------------------ #
 
     def _toggle_large_display(self, _event=None) -> None:
         if self._large_display and self._large_display.is_alive():
             self._large_display.close()
             self._large_display = None
-            return
-
-        # Prefer the currently-processing job; fall back to last history entry
-        sn, did = None, None
-        job = self._vm.current_job
-        if job and job.serial_number:
-            sn, did = job.serial_number, job.device_id
         else:
-            history = self._vm.history
-            if history and history[0].serial_number:
-                sn, did = history[0].serial_number, history[0].device_id
-
-        self._large_display = LargeDisplayWindow(
-            parent=self._root,
-            sn=sn,
-            device_id=did,
-            font_size=self._vm.config.large_display_font_size,
-        )
-
-    # ------------------------------------------------------------------ #
-    # Lifecycle                                                           #
-    # ------------------------------------------------------------------ #
+            self._large_display = LargeDisplayWindow(self._root, self._vm)
 
     def _on_close(self) -> None:
-        logger.info("Shutting down application")
+        logger.info("Main window closing")
+        if self._large_display and self._large_display.is_alive():
+            self._large_display.close()
         self._vm.stop()
         self._root.destroy()
 

@@ -10,7 +10,12 @@ from PIL import Image as PILImage
 from app.constants import Event
 from app.models.job import ProcessingJob, JobStatus
 from app.models.result import OCRResult
-from app.services.validator import validate_serial_number, validate_device_id, build_folder_name
+from app.services.validator import (
+    validate_serial_number,
+    validate_device_id,
+    build_folder_name,
+    sanitize_filename_str,
+)
 from app.viewmodels.app_viewmodel import AppViewModel
 
 logger = logging.getLogger(__name__)
@@ -423,8 +428,8 @@ class PreviewDialog:
         entry.grid(row=row, column=1, sticky="ew", padx=(8, 0), pady=4)
 
     def _update_folder(self) -> None:
-        sn = self._sn_var.get().strip().upper()
-        did = self._id_var.get().strip().upper()
+        sn = sanitize_filename_str(self._sn_var.get().strip().upper())
+        did = sanitize_filename_str(self._id_var.get().strip().upper())
 
         sn_ok = validate_serial_number(sn) if sn else False
         id_ok = validate_device_id(did) if did else False
@@ -437,16 +442,16 @@ class PreviewDialog:
         else:
             parts = []
             if sn and not sn_ok:
-                parts.append(f"S/N must be 8 uppercase alphanumeric characters")
+                parts.append("S/N must be 8 uppercase alphanumeric characters")
             if did and not id_ok:
-                parts.append(f"ID must match  ##S-X###  (e.g. 22S-A460)")
-            self._folder_var.set("—  Invalid format")
+                parts.append("ID must match ##S-X### (e.g. 22S-A460)")
+            self._folder_var.set("— Invalid format")
             self._folder_label.configure(text_color="#ef4444")
-            self._val_label.configure(text="  |  ".join(parts))
+            self._val_label.configure(text=" | ".join(parts))
 
     def _confirm(self) -> None:
-        sn = self._sn_var.get().strip().upper()
-        did = self._id_var.get().strip().upper()
+        sn = sanitize_filename_str(self._sn_var.get().strip().upper())
+        did = sanitize_filename_str(self._id_var.get().strip().upper())
         if not validate_serial_number(sn) or not validate_device_id(did):
             self._val_label.configure(text="Fix validation errors before confirming.")
             return

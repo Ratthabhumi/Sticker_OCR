@@ -103,6 +103,14 @@ class USBMonitor:
         )
         return Path(sorted_drives[0])
 
+    def get_all_drives(self) -> list[Path]:
+        """Return list of all connected USB drives sorted by priority."""
+        drives = sorted(
+            list(self._removable_drives()),
+            key=lambda d: 0 if ctypes.windll.kernel32.GetDriveTypeW(d) == 2 else 1
+        )
+        return [Path(d) for d in drives]
+
     def _loop(self) -> None:
         while not self._stop.is_set():
             current = self._removable_drives()

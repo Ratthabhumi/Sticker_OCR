@@ -1,10 +1,14 @@
 import logging
+import shutil
 import time
 from pathlib import Path
 
 from app.models.result import FolderResult
 
 logger = logging.getLogger(__name__)
+
+# Minimum free disk space required on target USB (10 MB)
+_MIN_FREE_BYTES = 10 * 1024 * 1024
 
 
 class FolderService:
@@ -23,6 +27,19 @@ class FolderService:
                     logger.warning("USB drive root not accessible (attempt %d/3)", attempt + 1)
                     time.sleep(1.0)
                     continue
+
+                # Disk free space check
+                try:
+                    usage = shutil.disk_usage(str(usb_root))
+                    if usage.free < _MIN_FREE_BYTES:
+                        free_mb = usage.free / (1024 * 1024)
+                        logger.error("USB disk space low: %.2f MB free", free_mb)
+                        return FolderResult(
+                            success=False,
+                            error_message=f"USB drive is full ({free_mb:.1f} MB free). Please free up space.",
+                        )
+                except Exception:
+                    pass
 
                 if job_folder.exists():
                     logger.info("Duplicate detected: %s", job_folder)
