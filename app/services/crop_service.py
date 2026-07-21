@@ -41,7 +41,7 @@ def get_image_rotations(img: np.ndarray) -> List[np.ndarray]:
 import time
 
 def read_image_safe(image_path: Path, timeout: float = 3.0) -> Optional[np.ndarray]:
-    """Read an image safely using np.fromfile + cv2.imdecode, retrying if locked/writing."""
+    """Read an image safely using open('rb') + cv2.imdecode, retrying if locked/writing."""
     abs_path = Path(image_path).resolve()
     start_time = time.time()
 
@@ -50,12 +50,13 @@ def read_image_safe(image_path: Path, timeout: float = 3.0) -> Optional[np.ndarr
             time.sleep(0.2)
             continue
         try:
-            # Use np.fromfile + cv2.imdecode to avoid Windows path/lock issues with cv2.imread
-            data = np.fromfile(str(abs_path), dtype=np.uint8)
-            if data.size > 0:
-                img = cv2.imdecode(data, cv2.IMREAD_COLOR)
-                if img is not None:
-                    return img
+            with open(abs_path, "rb") as f:
+                content = f.read()
+                if len(content) > 0:
+                    data = np.frombuffer(content, dtype=np.uint8)
+                    img = cv2.imdecode(data, cv2.IMREAD_COLOR)
+                    if img is not None:
+                        return img
         except Exception:
             pass
         time.sleep(0.2)
